@@ -1,0 +1,6 @@
+numpy>=1.26
+pandas>=2.0
+h5py>=3.10
+requests>=2.31
+matplotlib>=3.8
+torch>=2.2

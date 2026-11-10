@@ -1,0 +1,43 @@
+{
+  "data": "data/burgers_nu0.01_200.npz",
+  "nu": 0.009999999776482582,
+  "shape": [
+    200,
+    201,
+    1024
+  ],
+  "n_train": 160,
+  "n_val": 20,
+  "n_test": 20,
+  "n_params": 72001,
+  "best_val_mse": 1.819228802515871e-05,
+  "test_mse": 5.289046381733442e-06,
+  "test_rel_l2": 0.0018052222987171263,
+  "rollout_rel_l2": {
+    "mean": 0.06797090172767639,
+    "at_10": 0.021364472806453705,
+    "at_50": 0.07286862283945084,
+    "at_100": 0.10789281874895096
+  },
+  "config": {
+    "data": "data/burgers_nu0.01_200.npz",
+    "out": "results/runs/fno40_seed0",
+    "model": "fno",
+    "epochs": 40,
+    "batch_size": 32,
+    "lr": 0.001,
+    "weight_decay": 1e-05,
+    "width": 32,
+    "modes": 16,
+    "n_layers": 4,
+    "base": 16,
+    "val_frac": 0.1,
+    "test_frac": 0.1,
+    "max_train_pairs": 10000,
+    "max_val_pairs": 2000,
+    "rollout_steps": 100,
+    "patience": 10,
+    "seed": 0,
+    "device": "auto"
+  }
+}

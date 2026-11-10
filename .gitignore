@@ -1,0 +1,36 @@
+__pycache__/
+*.py[cod]
+.venv/
+.venv*/
+.deps/
+.pip-tmp/
+.env
+.ipynb_checkpoints/
+.pytest_cache/
+.mypy_cache/
+.DS_Store
+.idea/
+.vscode/
+
+# LaTeX build artifacts
+*.aux
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+
+# Data and generated artifacts
+data/*.npz
+data/*.h5
+data/*.hdf5
+results/runs/
+results/figures/
+*.pt
+*.pth
+*.ckpt
+*.log
+
+!data/.gitkeep
+!results/figures/.gitkeep
+!checkpoints/**/*.pt

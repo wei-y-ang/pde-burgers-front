@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pde-burgers-front"
+version = "0.1.0"
+description = "Neural operators for PDEBench 1D Burgers front prediction"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.0",
+    "h5py>=3.10",
+    "requests>=2.31",
+    "matplotlib>=3.8",
+    "torch>=2.2",
+]
+
+[tool.setuptools.packages.find]
+include = ["pde_burgers*"]
