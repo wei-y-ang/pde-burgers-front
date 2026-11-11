@@ -116,3 +116,78 @@
 - **Observation**: constant-channel conditioning underfits and fails OOD
   catastrophically. It is not usable as a final model.
 - **Next**: FiLM conditioning, per-`Nu` normalization, or MoE.
+
+## 2026-11-11 — fair multi-seed U-Net and Persistence baselines
+
+- Completed `unet40_seed1` and `unet40_seed2` with the same 40-epoch budget as
+  seed 0 (`max_train_pairs=10000`, `patience=10`, CPU).
+
+| Model | seed | one-step rel L2 | rollout mean |
+|---|---:|---:|---:|
+| U-Net | 0 | 0.005786 | 0.4327 |
+| U-Net | 1 | 0.003557 | 3.6296e11 |
+| U-Net | 2 | 0.005992 | 97.894 |
+
+- **Observation**: the two added seeds diverge during autoregressive rollout
+  despite reasonable one-step errors. Seed 0 alone substantially overstates
+  U-Net reliability. Report every seed, median, and full range rather than only
+  mean ± std.
+- Added deterministic Persistence (`u(t+k)=u(t)`):
+
+| Nu | one-step rel L2 | rollout mean |
+|---|---:|---:|
+| 0.01 (ID) | 0.02516 | 0.9472 |
+| 0.001 (OOD) | 0.05778 | 1.1204 |
+| 0.1 (OOD) | 0.008469 | 2.8563 |
+
+- FNO remains clearly better than Persistence, including on `Nu=0.1`.
+
+## 2026-11-11 — resolution generalization
+
+- Training resolution: 1024. Evaluation: shared physical points at 1024/512/256.
+- The front search window is scaled as `64 * resolution / 1024` to preserve its
+  physical width.
+
+| Model | 1024 | 512 | 256 |
+|---|---:|---:|---:|
+| FNO, 3-seed mean | 0.078563 | 0.078564 | 0.078570 |
+| FNO, 3-seed std | 0.009130 | 0.009132 | 0.009138 |
+| U-Net seed 0 | 0.4305 | 0.6495 | 1.0627 |
+
+- **Observation**: FNO rollout error is almost unchanged across resolutions.
+  U-Net seed 0 degrades as the grid coarsens; the other U-Net seeds diverge even
+  at 1024, so long-rollout instability is the dominant U-Net failure.
+- Outputs: `results/resolution_summary/per_run.csv`, `summary.csv`, and
+  `docs/figures/resolution_comparison.png`.
+
+## 2026-11-11 — reproducibility updates
+
+- Added `requirements-lock.txt` (Python 3.14.4, torch 2.11.0, numpy 2.4.4,
+  pandas 3.0.2; CPU: AMD Ryzen 7 8845H).
+- Added `scripts/reproduce_main.py` for data, all required seeds, Persistence,
+  fair paired comparisons, resolution evaluation, and figure generation.
+  Existing metrics are skipped unless `--overwrite` is supplied.
+
+## 2026-11-11 — sequence data-only replication and paired comparisons
+
+- Completed `seq_first_data_seed1` and `seq_first_data_seed2` with the original
+  `H=5`, first-step-only data supervision configuration.
+
+| Variant | one-step rel L2 | rollout mean |
+|---|---:|---:|
+| FNO baseline | 0.001843 ± 0.000033 | 0.07723 ± 0.00804 |
+| data-only FT | 0.001715 ± 0.000205 | 0.06496 ± 0.01513 |
+| PDE FT | 0.001531 ± 0.000096 | 0.06067 ± 0.01498 |
+| sequence data-only | 0.001635 ± 0.000094 | 0.06903 ± 0.01918 |
+
+| Paired comparison | mean delta ± std | Per-seed deltas |
+|---|---:|---|
+| PDE FT - data-only FT | -0.00429 ± 0.01143 | -0.00962 / +0.00884 / -0.01207 |
+| sequence data-only - FNO baseline | -0.00820 ± 0.01272 | -0.01758 / +0.00628 / -0.01330 |
+
+- **Conclusion**: both fine-tuning variants improve on only two of three seeds.
+  The original sequence seed-0 result (`0.0504`) did not replicate on seed 1
+  (`0.0887`). Neither variant can be claimed to provide a stable benefit.
+- Outputs: `results/fair_comparison/per_seed.csv`, `paired_deltas.csv`,
+  `paired_summary.csv`, `fair_comparison.png`, and
+  `rollout_error_comparison.png`.

@@ -2,7 +2,14 @@ import unittest
 
 import numpy as np
 
-from pde_burgers.data import BurgersPairs, BurgersSequences, compute_stats, split_samples
+from pde_burgers.data import (
+    BurgersData,
+    BurgersPairs,
+    BurgersSequences,
+    compute_stats,
+    downsample_burgers,
+    split_samples,
+)
 
 
 class TestData(unittest.TestCase):
@@ -30,6 +37,22 @@ class TestData(unittest.TestCase):
         x, y = ds[0]
         self.assertEqual(tuple(x.shape), (1, 32))
         self.assertEqual(tuple(y.shape), (3, 32))
+
+    def test_downsample_uses_shared_points(self):
+        x = (np.arange(32) + 0.5).astype(np.float32) / 32
+        t = np.arange(6, dtype=np.float32)
+        data = BurgersData(self.u, x, t, nu=0.01)
+        coarse = downsample_burgers(data, 16)
+        self.assertEqual(coarse.u.shape, (10, 6, 16))
+        np.testing.assert_array_equal(coarse.u, self.u[:, :, ::2])
+        np.testing.assert_array_equal(coarse.x, x[::2])
+        np.testing.assert_array_equal(coarse.nu_values, data.nu_values)
+
+    def test_downsample_rejects_incompatible_resolution(self):
+        x = (np.arange(32) + 0.5).astype(np.float32) / 32
+        data = BurgersData(self.u, x, np.arange(6, dtype=np.float32), nu=0.01)
+        with self.assertRaises(ValueError):
+            downsample_burgers(data, 17)
 
 
 if __name__ == "__main__":

@@ -30,7 +30,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from pde_burgers.data import load_burgers_npz, split_samples
+from pde_burgers.data import downsample_burgers, load_burgers_npz, split_samples
 from pde_burgers.front import front_metrics
 from pde_burgers.models import FNO1d, UNet1d
 from pde_burgers.utils import ensure_dir, save_json
@@ -43,6 +43,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--split", type=str, default="all", choices=["all", "test"])
     p.add_argument("--steps", type=int, default=100)
     p.add_argument("--max-samples", type=int, default=20)
+    p.add_argument("--resolution", type=int, default=0,
+                   help="Optional target spatial resolution; must divide the input grid.")
     p.add_argument("--out", type=str, default="results/ood/eval")
     p.add_argument("--device", type=str, default="cpu")
     return p.parse_args()
@@ -110,6 +112,9 @@ def main() -> None:
     mean, std = float(norm["mean"]), float(norm["std"])
 
     data = load_burgers_npz(args.data)
+    input_resolution = data.n_x
+    if args.resolution:
+        data = downsample_burgers(data, args.resolution)
     if args.split == "test":
         _, _, test_idx = split_samples(
             data.n_samples,
@@ -123,6 +128,7 @@ def main() -> None:
 
     indices = indices[: args.max_samples]
     steps = min(args.steps, data.n_times - 1)
+    search_window = max(1, int(round(64 * data.n_x / input_resolution)))
     device = torch.device(args.device)
     model = build_model(cfg).to(device)
     model.load_state_dict(torch.load(run_dir / "model.pt", map_location=device))
@@ -154,7 +160,7 @@ def main() -> None:
             pred[i],
             data.x,
             dt=data.dt,
-            search_window=64,
+            search_window=search_window,
         )
         rows.append(
             {
@@ -190,6 +196,9 @@ def main() -> None:
         "split": args.split,
         "n_samples": int(len(indices)),
         "steps": int(steps),
+        "input_resolution": input_resolution,
+        "resolution": data.n_x,
+        "front_search_window": search_window,
         "rel_l2": {
             "mean": float(rel.mean()),
             "at_10": float(per_step[9]) if steps >= 10 else None,

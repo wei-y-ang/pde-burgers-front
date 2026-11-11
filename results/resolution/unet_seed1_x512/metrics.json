@@ -1,0 +1,43 @@
+{
+  "run": "results\\runs\\unet40_seed1",
+  "data": "data/burgers_nu0.01_200.npz",
+  "nu": 0.009999999776482582,
+  "split": "test",
+  "n_samples": 16,
+  "steps": 100,
+  "input_resolution": 1024,
+  "resolution": 512,
+  "front_search_window": 32,
+  "rel_l2": {
+    "mean": 54918756958208.0,
+    "at_10": 0.3782685697078705,
+    "at_50": 1101696.25,
+    "at_100": 1814741391507456.0
+  },
+  "front": {
+    "position_mae": {
+      "mean": 0.23382690429687503,
+      "std": 0.11708228946143523
+    },
+    "position_mae_aligned": {
+      "mean": 0.1149365234375,
+      "std": 0.08560828795314099
+    },
+    "position_bias": {
+      "mean": -0.00091552734375,
+      "std": 0.23258935359852384
+    },
+    "speed_abs_error": {
+      "mean": 0.5037063633392351,
+      "std": 0.4628781195267901
+    },
+    "speed_true": {
+      "mean": 0.0567093343102317,
+      "std": 0.6106039455297245
+    },
+    "speed_pred": {
+      "mean": 0.21707823122940176,
+      "std": 0.3262763170058504
+    }
+  }
+}

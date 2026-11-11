@@ -6,9 +6,10 @@
 **Neural operators for PDEBench 1D Burgers front prediction.**
 
 > On 200 public Burgers trajectories, FNO1D reaches a mean 100-step rollout
-> relative L2 error of 0.077, compared with 0.433 for U-Net1D. One-step PDE
-> fine-tuning reduces the FNO error to 0.061. The project also reports
-> out-of-distribution limits and negative results rather than hiding them.
+> relative L2 error of 0.077 across three stable seeds; two added U-Net seeds
+> diverge autoregressively. FNO error stays near 0.0786 when the evaluation grid
+> changes from 1024 to 512 and 256. PDE and sequence fine-tuning are evaluated
+> with paired seeds, and their benefits remain inconclusive.
 
 This repository learns a PDE surrogate from **public** PDEBench data, with a
 clear path from a supervised baseline to physics-informed fine-tuning. The
@@ -51,6 +52,8 @@ python -m venv .venv
 # Windows
 .venv\Scripts\activate
 pip install -r requirements.txt
+# For the exact package versions used in the updated experiments:
+# pip install -r requirements-lock.txt
 ```
 
 ### Download only 200 trajectories
@@ -76,9 +79,18 @@ python scripts/smoke_test.py
 python -m unittest discover -s tests -v
 ```
 
-On Unix-like systems with `make`, `make reproduce` runs the unit tests,
-downloads the 200-trajectory subset, trains one FNO baseline, and plots a
-rollout. The individual commands below work on Windows without `make`.
+To reproduce the complete fair-comparison and resolution tables:
+
+```bash
+python scripts/reproduce_main.py
+```
+
+The script downloads missing data, runs any missing seed experiments, evaluates
+Persistence and resolution generalization, and regenerates the main figures.
+Existing metrics are reused by default; `--overwrite` forces a full rerun.
+`make reproduce` is equivalent, while `make reproduce-minimal` runs only the
+original single-baseline pipeline. The updated environment is Windows,
+Python 3.14.4, PyTorch 2.11.0, CPU (AMD Ryzen 7 8845H).
 
 ### Train FNO1D
 
@@ -147,10 +159,12 @@ python -m pde_burgers.train \
   --lr 1e-4
 ```
 
-In our seed-0 runs, sequence-level PDE loss was **not** better than one-step
-PDE fine-tuning: the unrolled PDE residual amplified prediction errors.  The
-best sequence variant was data-only first-step supervision (rollout mean
-0.0504), but this is a single-seed result and needs more runs.
+Sequence-level PDE loss was **not** better than one-step PDE fine-tuning:
+the unrolled PDE residual amplified prediction errors. Data-only first-step
+supervision was more promising (`0.0504` on seed 0), so we repeated it with
+three seeds. The resulting rollout mean is `0.0690 ± 0.0192`; two seeds improve
+over the baseline and one worsens, so the single-seed improvement is not
+conclusive.
 
 We also tried `H=2` with the PDE tail detached (`--detach-seq-pde`).  Both the
 data-only control and the PDE variant were around `0.101` rollout mean, much
@@ -207,6 +221,16 @@ leakage.
 - **FNO1D**: spectral convolution + pointwise residual block.
 - **U-Net1D**: strong convolutional baseline.
 
+```mermaid
+graph LR
+    X["Input profile u(t)"] --> L["Lifting"]
+    L --> F["4 × Fourier block<br/>spectral conv + pointwise conv + GELU"]
+    F --> P["Projection"]
+    P --> Y["Predicted profile u(t+1)"]
+    Y --> R["Autoregressive rollout"]
+    R --> L
+```
+
 Both take a normalized profile `u(t)` of shape `(B, 1, X)` and predict
 `u(t+1)`.
 
@@ -217,24 +241,50 @@ is reported separately.
 
 ## 5. Current results
 
-40 epochs, 200 trajectories, CPU.  FNO is run with 3 seeds; U-Net with 1 seed.
+40 epochs, 200 trajectories, CPU. All learned models now use 3 seeds.
 Fine-tuning starts from each seed's checkpoint and runs 10 more epochs at
 `lr=1e-4`.
 
-| Model | Params | One-step rel L2 | Rollout mean rel L2 (100 steps) |
+| Model | Params | One-step rel L2 (mean ± std) | 100-step rollout rel L2 |
 |---|---:|---:|---:|
 | FNO1D (w=32, m=16, 4 blocks) | 72,001 | 0.00184 ± 0.00003 | 0.0772 ± 0.0080 |
 | FNO + data-only FT | 72,001 | 0.00171 ± 0.00021 | 0.0650 ± 0.0151 |
 | FNO + PDE FT (λ=1e-3) | 72,001 | 0.00153 ± 0.00010 | 0.0607 ± 0.0150 |
-| U-Net1D (base=16) | 46,001 | 0.00579 | 0.4327 |
+| FNO + sequence data-only | 72,001 | 0.00164 ± 0.00009 | 0.0690 ± 0.0192 |
+| U-Net1D (base=16) | 46,001 | 0.00511 ± 0.00135 | median 97.894; range 0.4327–3.63e11 |
+| Persistence | — | 0.02516 | 0.9472 (deterministic) |
 
-The FNO prediction captures the diagonal front structure but smooths sharp
-shocks.  PDE fine-tuning gives a small improvement, but the seed variance is
-still large; treat it as promising rather than conclusive.
+FNO statistics are mean ± std over three seeds. U-Net's mean is dominated by
+two divergent rollouts, so its median and full range are more informative.
+The per-seed values and paired comparisons are in `results/fair_comparison/`.
 
-![FNO rollout across seeds](docs/figures/fno40_rollout_mean_std.png)
+- PDE minus data-only FT: mean paired delta `-0.00429 ± 0.01143`; 2 of 3 seeds improve.
+- Sequence data-only minus FNO baseline: mean paired delta `-0.00820 ± 0.01272`; 2 of 3 seeds improve.
+- Neither fine-tuning variant shows a stable benefit across all seeds. The earlier single-seed sequence result (`0.0504`) did not generalize to seed 1 (`0.0887`).
+- U-Net seed 0 rolls out at `0.4327`, but seeds 1 and 2 diverge to `3.63e11` and `97.894`, respectively. One-step accuracy alone is not a reliable stability metric.
 
-![Fine-tuning comparison](docs/figures/finetune_rollout_comparison.png)
+![Fair multi-seed comparison](docs/figures/fair_comparison.png)
+
+![Rollout error growth](docs/figures/rollout_error_comparison.png)
+
+### Resolution generalization
+
+Models trained on the 1024-point grid were evaluated on shared physical points
+at 512 and 256 points. The front search window is scaled with resolution so its
+physical size stays fixed. FNO rollout error is nearly unchanged:
+
+| Evaluation grid | 1024 | 512 | 256 |
+|---|---:|---:|---:|
+| FNO rollout mean rel L2 (3 seeds) | 0.078563 ± 0.009130 | 0.078564 ± 0.009132 | 0.078570 ± 0.009138 |
+
+U-Net behaves differently. For seed 0, the corresponding errors grow from
+`0.4305` to `0.6495` and `1.0627`; seeds 1 and 2 diverge during autoregressive
+rollout even at the training resolution. Thus the resolution result supports
+FNO's discretization robustness, while U-Net's dominant failure is long-rollout
+instability rather than a clean resolution trend. All individual seed values
+are preserved in `results/resolution_summary/per_run.csv`.
+
+![Resolution generalization](docs/figures/resolution_comparison.png)
 
 ### OOD and front metrics
 
@@ -267,7 +317,10 @@ shocks. The speed is a linear fit to the tracked front position.
 | FNO + PDE | 0.1 (OOD) | 0.7901 | 0.0524 | 0.1537 |
 
 The OOD failure is asymmetric: the model degrades much more on the smoother
-`ν=0.1` regime than on the sharper `ν=0.001` regime.
+`ν=0.1` regime than on the sharper `ν=0.001` regime. The deterministic
+Persistence baseline (`u(t+k)=u(t)`) reaches rollout means `0.9472` (ID),
+`1.1204` (`ν=0.001`), and `2.8563` (`ν=0.1`). FNO is better in all three cases,
+so even its weak `ν=0.1` result is not equivalent to predicting no motion.
 
 ![OOD metrics](docs/figures/ood_metrics.png)
 
@@ -305,6 +358,7 @@ pde-burgers-front/
 ├─ LICENSE
 ├─ Makefile
 ├─ requirements.txt
+├─ requirements-lock.txt
 ├─ pyproject.toml
 ├─ .github/workflows/ci.yml
 ├─ checkpoints/fno40_seed0/
@@ -327,6 +381,10 @@ pde-burgers-front/
 │  ├─ smoke_test.py
 │  ├─ plot_rollout.py
 │  ├─ evaluate_ood.py
+│  ├─ evaluate_persistence.py
+│  ├─ reproduce_main.py
+│  ├─ summarize_fair_comparison.py
+│  ├─ summarize_resolution.py
 │  ├─ summarize_ood.py
 │  └─ plot_ood.py
 ├─ tests/
@@ -337,13 +395,14 @@ pde-burgers-front/
 
 ## 8. Roadmap
 
-Completed: FNO/U-Net baselines, rollout evaluation, one-step PDE fine-tuning,
-OOD evaluation, front metrics, and the two negative-result studies above.
+Completed: three-seed FNO/U-Net baselines, paired fine-tuning comparisons,
+Persistence, full rollout curves, OOD/front metrics, resolution generalization,
+and the negative-result studies above.
 
 Next steps:
 
 1. Replace constant-channel conditioning with FiLM or per-`Nu` normalization.
-2. Run more seeds before drawing stronger conclusions about PDE fine-tuning.
+2. Add a conservative numerical Burgers solver for speed–accuracy comparison.
 3. Study the asymmetric failure on smoother `Nu=0.1` data.
 
 ---

@@ -89,6 +89,31 @@ def load_burgers_npz(path: str | Path) -> BurgersData:
     )
 
 
+def downsample_burgers(data: BurgersData, target_x: int) -> BurgersData:
+    """Subsample trajectories and coordinates at shared physical grid points.
+
+    ``target_x`` must divide the original number of grid points.  The same
+    integer stride is applied to ``u`` and ``x``, so the periodic grid spacing
+    and physical coordinates remain consistent.
+    """
+
+    if target_x <= 0:
+        raise ValueError("target_x must be positive")
+    if target_x > data.n_x:
+        raise ValueError(f"target_x={target_x} exceeds input resolution {data.n_x}")
+    if data.n_x % target_x != 0:
+        raise ValueError(f"input resolution {data.n_x} is not divisible by {target_x}")
+    stride = data.n_x // target_x
+    return BurgersData(
+        u=data.u[:, :, ::stride].copy(),
+        x=data.x[::stride].copy(),
+        t=data.t.copy(),
+        nu=data.nu,
+        source=data.source,
+        nu_per_sample=data.nu_values.copy(),
+    )
+
+
 def combine_burgers(data_list: list[BurgersData]) -> BurgersData:
     """Concatenate multiple single-nu subsets along the sample axis."""
 

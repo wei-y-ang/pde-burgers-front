@@ -1,4 +1,4 @@
-.PHONY: install test smoke data train reproduce clean
+.PHONY: install test smoke data train reproduce reproduce-minimal clean
 
 install:
 	pip install -r requirements.txt
@@ -15,7 +15,10 @@ data:
 train:
 	python -m pde_burgers.train --data data/burgers_nu0.01_200.npz --model fno --out results/runs/fno --epochs 40 --batch-size 32 --width 32 --modes 16 --n-layers 4
 
-reproduce: test data train
+reproduce:
+	python scripts/reproduce_main.py
+
+reproduce-minimal: test data train
 	python scripts/plot_rollout.py --npz results/runs/fno/rollout_example.npz --out-dir results/figures/fno
 
 clean:
